@@ -63,6 +63,8 @@ export default async function LoginPage({
           </p>
         </div>
 
+        {/* 登录按钮容器 - 包含 GitHub 和 Google 登录选项 */}
+
         {searchParams.error && (
           <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">
             {searchParams.error}
