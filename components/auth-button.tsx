@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { logout } from "@/app/auth/logout/actions";
 
 export function AuthButton({
   user,
@@ -19,22 +20,15 @@ export function AuthButton({
           {user.email || "已登录"}
         </span>
         <form
-          action="/auth/logout"
-          method="post"
-          onSubmit={async (e) => {
-            e.preventDefault();
+          action={async () => {
             setIsLoading(true);
-            const formData = new FormData(e.currentTarget);
-            await fetch("/auth/logout", {
-              method: "POST",
-              body: formData,
-            });
+            await logout();
             router.refresh();
-            setIsLoading(false);
+            router.push("/");
           }}
         >
           <Button type="submit" variant="outline" disabled={isLoading}>
-            {isLoading ? "登出中..." : "登出"}
+            {isLoading ? "登出中..." : "退出登录"}
           </Button>
         </form>
       </div>
