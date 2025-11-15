@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useTransition } from "react";
 import { logout } from "@/app/auth/logout/actions";
 
 export function AuthButton({
@@ -11,7 +11,15 @@ export function AuthButton({
   user: { id: string; email?: string } | null;
 }) {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const handleLogout = () => {
+    startTransition(async () => {
+      await logout();
+      router.refresh();
+      router.push("/");
+    });
+  };
 
   if (user) {
     return (
@@ -19,18 +27,14 @@ export function AuthButton({
         <span className="text-sm text-muted-foreground">
           {user.email || "已登录"}
         </span>
-        <form
-          action={async () => {
-            setIsLoading(true);
-            await logout();
-            router.refresh();
-            router.push("/");
-          }}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleLogout}
+          disabled={isPending}
         >
-          <Button type="submit" variant="outline" disabled={isLoading}>
-            {isLoading ? "登出中..." : "退出登录"}
-          </Button>
-        </form>
+          {isPending ? "登出中..." : "退出登录"}
+        </Button>
       </div>
     );
   }
