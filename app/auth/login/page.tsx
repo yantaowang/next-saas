@@ -2,6 +2,31 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { headers } from "next/headers";
+
+async function handleLogin(formData: FormData) {
+  "use server";
+
+  const next = formData.get("next") as string | null;
+  const headersList = await headers();
+  const origin = headersList.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "github",
+    options: {
+      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next ?? "/")}`,
+    },
+  });
+
+  if (error) {
+    redirect(`/auth/login?error=${encodeURIComponent(error.message)}${next ? `&next=${encodeURIComponent(next)}` : ""}`);
+  }
+
+  if (data?.url) {
+    redirect(data.url);
+  }
+}
 
 export default async function LoginPage({
   searchParams,
@@ -34,7 +59,7 @@ export default async function LoginPage({
           </div>
         )}
 
-        <form action="/auth/login" method="get">
+        <form action={handleLogin}>
           {searchParams.next && (
             <input type="hidden" name="next" value={searchParams.next} />
           )}
