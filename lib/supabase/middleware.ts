@@ -10,6 +10,16 @@ export async function updateSession(request: NextRequest) {
     request,
   });
 
+  // 跳过静态资源
+  const pathname = request.nextUrl.pathname;
+  if (
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/api/") ||
+    /\.(svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot)$/.test(pathname)
+  ) {
+    return supabaseResponse;
+  }
+
   // 如果环境变量未设置，跳过中间件检查
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     return supabaseResponse;

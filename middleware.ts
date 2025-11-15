@@ -12,9 +12,10 @@ export const config = {
      * - _next/static (静态文件)
      * - _next/image (图片优化文件)
      * - favicon.ico (favicon文件)
-     * - public 文件夹中的文件
+     * - public 文件夹中的文件（.svg, .png, .jpg, .jpeg, .gif, .webp 等）
+     * - api 路由（如果需要）
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|_next/webpack-hmr|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot)$).*)",
   ],
 };
 
