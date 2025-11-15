@@ -2,12 +2,24 @@
 
 ## 1. 环境变量配置
 
+### 本地开发环境
+
 在 `.env.local` 文件中添加以下配置：
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
+
+### Vercel 部署环境
+
+在 Vercel 项目设置中添加以下环境变量：
+
+1. 进入 Vercel Dashboard → 你的项目 → Settings → Environment Variables
+2. 添加以下变量：
+   - `NEXT_PUBLIC_SUPABASE_URL` = 你的 Supabase 项目 URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = 你的 Supabase Anon Key
+   - `NEXT_PUBLIC_SITE_URL` = 你的 Vercel 部署 URL（例如：`https://your-app.vercel.app`）
 
 这些值可以在 [Supabase Dashboard](https://app.supabase.com) → 项目设置 → API 中找到。
 
@@ -121,11 +133,36 @@ const supabase = createClient();
 // 注意：客户端认证操作应该通过 API 路由进行
 ```
 
-## 5. 重要提示
+## 5. Vercel 部署检查清单
+
+如果部署到 Vercel 后 Google 登录按钮不显示，请检查：
+
+### ✅ 环境变量配置
+- [ ] 在 Vercel 项目设置中添加了 `NEXT_PUBLIC_SUPABASE_URL`
+- [ ] 在 Vercel 项目设置中添加了 `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- [ ] 在 Vercel 项目设置中添加了 `NEXT_PUBLIC_SITE_URL`（你的 Vercel 部署 URL）
+
+### ✅ Supabase 配置
+- [ ] 在 Supabase Dashboard 中启用了 Google Provider
+- [ ] 配置了 Google Client ID 和 Client Secret
+- [ ] 在 Supabase 的 Redirect URLs 中添加了你的 Vercel URL：`https://your-app.vercel.app/auth/callback`
+
+### ✅ Google Cloud Console 配置
+- [ ] 在 Google Cloud Console 的 OAuth 客户端中配置了正确的重定向 URI：
+  - `https://your-app.vercel.app/auth/callback`
+- [ ] 在 Authorized JavaScript origins 中添加了：
+  - `https://your-app.vercel.app`
+
+### ✅ 重新部署
+- [ ] 添加环境变量后，重新部署了应用
+- [ ] 清除浏览器缓存后重新访问登录页面
+
+## 6. 重要提示
 
 - 所有认证操作都在服务器端进行，符合 Supabase SSR 最佳实践
 - 中间件会自动刷新用户会话
 - 不要在全局变量中存储 Supabase 客户端实例
 - 每次使用时都创建新的客户端实例
 - 支持 GitHub 和 Google 两种登录方式，用户可以选择任意一种
+- **在 Vercel 上部署时，务必设置 `NEXT_PUBLIC_SITE_URL` 环境变量**
 

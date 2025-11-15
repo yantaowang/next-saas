@@ -10,7 +10,16 @@ async function handleLogin(formData: FormData) {
   const provider = formData.get("provider") as string;
   const next = formData.get("next") as string | null;
   const headersList = await headers();
-  const origin = headersList.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  
+  // 在 Vercel 上，优先使用环境变量，然后尝试从 headers 获取
+  const host = headersList.get("host");
+  const protocol = headersList.get("x-forwarded-proto") || "https";
+  const origin = 
+    process.env.NEXT_PUBLIC_SITE_URL || 
+    (host ? `${protocol}://${host}` : null) ||
+    headersList.get("origin") ||
+    "http://localhost:3000";
+  
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
