@@ -18,8 +18,14 @@ async function handleLogin(formData: FormData) {
     process.env.NEXT_PUBLIC_SITE_URL || 
     (host ? `${protocol}://${host}` : null) ||
     headersList.get("origin") ||
-    "http://localhost:3000";
-  
+    "https://next-saas-self.vercel.app";
+
+  console.log("origin", origin);
+  console.log("origin1", headersList.get("origin"));
+  console.log("url", process.env.NEXT_PUBLIC_SITE_URL);
+  console.log("host", host);
+  console.log("protocol", protocol);
+
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
