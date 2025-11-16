@@ -13,12 +13,19 @@ async function handleLogin(formData: FormData) {
   
   // 在 Vercel 上，优先使用环境变量，然后尝试从 headers 获取
   const host = headersList.get("host");
-  const protocol = headersList.get("x-forwarded-proto") || "https";
+  // 本地开发时使用 http，生产环境使用 https
+  const protocol = 
+    process.env.NODE_ENV === "development" 
+      ? "http" 
+      : (headersList.get("x-forwarded-proto") || "https");
+  
   const origin = 
     process.env.NEXT_PUBLIC_SITE_URL || 
     (host ? `${protocol}://${host}` : null) ||
     headersList.get("origin") ||
-    "https://next-saas-self.vercel.app";
+    (process.env.NODE_ENV === "development" 
+      ? "http://localhost:3000" 
+      : "https://next-saas-self.vercel.app");
 
   console.log("origin", origin);
   console.log("origin1", headersList.get("origin"));
