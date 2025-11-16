@@ -26,6 +26,8 @@ async function handleLogin(formData: FormData) {
   console.log("host", host);
   console.log("protocol", protocol);
 
+  debugger;
+
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
