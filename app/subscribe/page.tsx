@@ -1,16 +1,94 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SubscribeForm } from "@/components/subscribe-form";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckCircle, XCircle, Home } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default async function SubscribePage({
   searchParams,
 }: {
-  searchParams: { plan?: string };
+  searchParams: { plan?: string; success?: string; canceled?: string };
 }) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // 检查支付结果
+  if (searchParams.success === "true") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4">
+              <CheckCircle className="h-12 w-12 text-green-500" />
+            </div>
+            <CardTitle className="text-2xl">订阅成功！</CardTitle>
+            <CardDescription>
+              恭喜！您已成功订阅专业版
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <p className="text-sm text-green-800 dark:text-green-200">
+                ✓ 无限次提问<br/>
+                ✓ 优先响应<br/>
+                ✓ 高级功能访问<br/>
+                ✓ 邮件支持
+              </p>
+            </div>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 text-center">
+              您现在可以享受所有专业版功能
+            </p>
+            <div className="flex flex-col gap-2">
+              <Link href="/">
+                <Button className="w-full">
+                  开始使用
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (searchParams.canceled === "true") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4">
+              <XCircle className="h-12 w-12 text-amber-500" />
+            </div>
+            <CardTitle className="text-2xl">支付已取消</CardTitle>
+            <CardDescription>
+              您可以随时返回重新订阅
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              您可以随时返回首页重新订阅
+            </p>
+            <div className="flex flex-col gap-2">
+              <Link href="/">
+                <Button variant="outline" className="w-full">
+                  返回首页
+                </Button>
+              </Link>
+              <Link href="/subscribe">
+                <Button className="w-full">
+                  重新订阅
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // 如果用户未登录，重定向到登录页面
   if (!user) {
@@ -22,26 +100,15 @@ export default async function SubscribePage({
   const plans = {
     pro: {
       name: "专业版",
-      price: 29,
+      price: 4.50,
       period: "每月",
+      currency: "$",
       features: [
         "无限次提问",
         "优先响应",
         "高级功能访问",
         "邮件支持",
         "优先更新",
-      ],
-    },
-    enterprise: {
-      name: "企业版",
-      price: 299,
-      period: "每月",
-      features: [
-        "专业版所有功能",
-        "专属客户经理",
-        "API 访问",
-        "定制化服务",
-        "SLA 保障",
       ],
     },
   };
@@ -58,13 +125,6 @@ export default async function SubscribePage({
           <p className="text-zinc-600 dark:text-zinc-400">
             点击下方按钮跳转到 Creem 安全支付页面完成支付
           </p>
-          {searchParams.canceled === "true" && (
-            <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                支付已取消，您可以重新尝试
-              </p>
-            </div>
-          )}
         </div>
 
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-6 mb-6">
@@ -73,7 +133,7 @@ export default async function SubscribePage({
           </h2>
           <div className="flex items-baseline gap-2 mb-4">
             <span className="text-3xl font-bold text-black dark:text-zinc-50">
-              ¥{selectedPlan.price}
+              {selectedPlan.currency}{selectedPlan.price}
             </span>
             <span className="text-sm text-zinc-600 dark:text-zinc-400">
               /{selectedPlan.period}

@@ -96,7 +96,7 @@ export default async function Home() {
       
       {/* 价格表 */}
       <div id="pricing-table">
-        <PricingTable user={user} />
+        <PricingTable user={user} isSubscribed={isSubscribed} />
       </div>
     </div>
   );

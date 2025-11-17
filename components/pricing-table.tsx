@@ -2,31 +2,35 @@
 
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 interface PricingTableProps {
   user?: { id: string; email?: string } | null;
+  isSubscribed?: boolean;
 }
 
-export function PricingTable({ user }: PricingTableProps) {
+export function PricingTable({ user, isSubscribed }: PricingTableProps) {
   const router = useRouter();
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
   const plans = [
     {
       name: "免费版",
-      price: "¥0",
+      price: "$0",
       period: "永久免费",
       features: [
         "基础功能访问",
         "每日 10 次提问",
         "社区支持",
       ],
-      cta: "当前版本",
+      cta: isSubscribed ? "管理订阅" : "当前版本",
       variant: "outline" as const,
       disabled: true,
     },
     {
       name: "专业版",
-      price: "¥29",
+      price: "$4.50",
       period: "每月",
       features: [
         "无限次提问",
@@ -35,39 +39,81 @@ export function PricingTable({ user }: PricingTableProps) {
         "邮件支持",
         "优先更新",
       ],
-      cta: "立即订阅",
+      cta: isSubscribed ? "已订阅" : "立即订阅",
       variant: "default" as const,
       highlighted: true,
-    },
-    {
-      name: "企业版",
-      price: "¥299",
-      period: "每月",
-      features: [
-        "专业版所有功能",
-        "专属客户经理",
-        "API 访问",
-        "定制化服务",
-        "SLA 保障",
-      ],
-      cta: "联系销售",
-      variant: "outline" as const,
+      disabled: isSubscribed,
     },
   ];
 
+  const handleSubscribe = async (planName: string) => {
+    if (!user) {
+      // 如果用户未登录，跳转到登录页面
+      router.push("/auth/login?next=/");
+      return;
+    }
+
+    if (planName !== "专业版") return;
+
+    setLoadingPlan(planName);
+
+    try {
+      // 创建 Creem 支付会话
+      const response = await fetch("/api/creem/create-checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          successUrl: `${window.location.origin}/subscribe?success=true`,
+          cancelUrl: `${window.location.origin}/subscribe?canceled=true`,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("创建支付会话失败:", data.error);
+        alert("创建支付会话失败，请稍后重试");
+        return;
+      }
+
+      // 跳转到 Creem 支付页面
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        alert("支付链接无效，请联系客服");
+      }
+
+    } catch (error) {
+      console.error("支付处理错误:", error);
+      alert("支付处理失败，请稍后重试");
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
   return (
     <div className="w-full py-16 px-4 bg-zinc-50 dark:bg-black">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold tracking-tight text-black dark:text-zinc-50 mb-4">
             选择适合您的方案
           </h2>
           <p className="text-lg text-zinc-600 dark:text-zinc-400">
-            灵活的定价方案，满足不同需求
+            解锁无限提问能力，提升工作效率
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {!isSubscribed && user && (
+          <div className="mb-8 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+            <p className="text-amber-800 dark:text-amber-200 text-center">
+              💡 升级到专业版，解锁无限次提问功能
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {plans.map((plan, index) => (
             <div
               key={index}
@@ -128,28 +174,30 @@ export function PricingTable({ user }: PricingTableProps) {
               <Button
                 variant={plan.variant}
                 className="w-full"
-                disabled={plan.disabled}
-                onClick={() => {
-                  if (plan.disabled) return;
-                  
-                  // 如果用户未登录，跳转到登录页面
-                  if (!user) {
-                    router.push("/auth/login?next=/subscribe");
-                    return;
-                  }
-
-                  // 根据计划跳转到支付页面
-                  if (plan.name === "专业版") {
-                    router.push("/subscribe?plan=pro");
-                  } else if (plan.name === "企业版") {
-                    router.push("/subscribe?plan=enterprise");
-                  }
-                }}
+                disabled={plan.disabled || loadingPlan === plan.name}
+                onClick={() => handleSubscribe(plan.name)}
               >
-                {plan.cta}
+                {loadingPlan === plan.name ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    处理中...
+                  </>
+                ) : (
+                  plan.cta
+                )}
               </Button>
+
+              {plan.highlighted && !user && (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center mt-2">
+                  需要登录后订阅
+                </p>
+              )}
             </div>
           ))}
+        </div>
+
+        <div className="mt-8 text-center text-sm text-zinc-600 dark:text-zinc-400">
+          <p>支持安全支付 • 随时取消 • 30天退款保证</p>
         </div>
       </div>
     </div>

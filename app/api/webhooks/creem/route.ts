@@ -8,7 +8,8 @@ import { verifyCreemWebhook } from "@/lib/creem";
  */
 export async function POST(request: Request) {
   try {
-    const signature = request.headers.get("x-creem-signature");
+    const signature = request.headers.get("x-creem-signature") ||
+                     request.headers.get("creem-signature");
     const webhookSecret = process.env.CREEM_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
@@ -20,9 +21,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.text();
+    console.log("收到 Creem webhook，签名:", signature);
 
-    // 验证 webhook 签名
+    // 验证 webhook 签名（如果提供了签名）
     if (signature && !verifyCreemWebhook(body, signature, webhookSecret)) {
+      console.error("Webhook 签名验证失败");
       return NextResponse.json(
         { error: "无效的签名" },
         { status: 401 }
@@ -30,13 +33,18 @@ export async function POST(request: Request) {
     }
 
     const event = JSON.parse(body);
+    console.log("Webhook 事件:", { type: event.type, id: event.id });
 
     // 处理不同类型的事件
     switch (event.type) {
+      case "checkout.session.completed":
       case "checkout.completed":
+      case "payment.succeeded":
         await handleCheckoutCompleted(event.data);
         break;
+      case "checkout.session.expired":
       case "checkout.failed":
+      case "payment.failed":
         await handleCheckoutFailed(event.data);
         break;
       case "subscription.canceled":
@@ -57,89 +65,143 @@ export async function POST(request: Request) {
 }
 
 /**
+ * 计算下个月的同一天
+ */
+function calculateNextMonthDate(): string {
+  const now = new Date();
+  const nextMonth = new Date(now);
+  nextMonth.setMonth(now.getMonth() + 1);
+
+  // 如果是月末，确保下个月也是月末
+  if (now.getDate() > 28) {
+    const lastDayOfNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+    nextMonth.setDate(Math.min(now.getDate(), lastDayOfNextMonth));
+  }
+
+  return nextMonth.toISOString();
+}
+
+/**
  * 处理支付成功事件
  */
 async function handleCheckoutCompleted(data: any) {
   const supabase = await createClient();
 
-  const { metadata, customer_email } = data;
-  const userId = metadata?.user_id;
-  const plan = metadata?.plan;
+  console.log("处理支付成功事件:", data.id);
 
-  if (!userId || !plan) {
-    console.error("缺少必要的元数据:", { userId, plan });
+  const { metadata, customer_email, id, subscription_id, payment_id, amount, currency } = data;
+  const userId = metadata?.user_id;
+  const userEmail = metadata?.user_email || customer_email;
+
+  if (!userId) {
+    console.error("缺少必要的用户ID元数据");
     return;
   }
 
-  // 计算过期时间（30天）
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 30);
-
-  // 检查是否已有订阅
-  const { data: existingSubscription } = await supabase
-    .from("subscriptions")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .single();
-
-  if (existingSubscription) {
-    // 更新现有订阅
-    await supabase
-      .from("subscriptions")
+  try {
+    // 更新支付记录
+    const { error: paymentError } = await supabase
+      .from('payments')
       .update({
-        plan: plan,
-        status: "active",
-        expires_at: expiresAt.toISOString(),
-        updated_at: new Date().toISOString(),
+        status: 'succeeded',
+        creem_payment_id: payment_id,
+        updated_at: new Date().toISOString()
       })
-      .eq("id", existingSubscription.id);
-  } else {
-    // 创建新订阅
-    await supabase.from("subscriptions").insert({
-      user_id: userId,
-      plan: plan,
-      status: "active",
-      expires_at: expiresAt.toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-  }
+      .eq('creem_checkout_session_id', id);
 
-  console.log("订阅已激活:", { userId, plan });
+    if (paymentError) {
+      console.error('更新支付记录失败:', paymentError);
+    }
+
+    // 创建或更新订阅记录
+    const subscriptionData = {
+      user_id: userId,
+      creem_subscription_id: subscription_id,
+      product_id: metadata?.product_id || process.env.CREEM_PRODUCT_ID,
+      status: 'active',
+      price_amount: amount || 4.50,
+      price_currency: currency || 'USD',
+      billing_cycle: 'monthly',
+      current_period_start: data.created_at ? new Date(data.created_at).toISOString() : new Date().toISOString(),
+      current_period_end: calculateNextMonthDate(),
+      cancel_at_period_end: false,
+      metadata: {
+        creem_session_id: id,
+        user_email: userEmail,
+        payment_method: data.payment_method
+      }
+    };
+
+    const { error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .upsert(subscriptionData, {
+        onConflict: 'user_id',
+        ignoreDuplicates: false
+      });
+
+    if (subscriptionError) {
+      console.error('创建/更新订阅记录失败:', subscriptionError);
+    } else {
+      console.log('订阅创建/更新成功:', { userId, userEmail });
+    }
+
+  } catch (error) {
+    console.error('处理支付成功事件失败:', error);
+  }
 }
 
 /**
  * 处理支付失败事件
  */
 async function handleCheckoutFailed(data: any) {
-  console.log("支付失败:", data);
-  // 可以在这里记录失败日志或发送通知
+  try {
+    console.log("处理支付失败事件:", data.id);
+
+    const supabase = await createClient();
+
+    // 更新支付记录
+    const { error: paymentError } = await supabase
+      .from('payments')
+      .update({
+        status: 'failed',
+        updated_at: new Date().toISOString()
+      })
+      .eq('creem_checkout_session_id', data.id);
+
+    if (paymentError) {
+      console.error('更新支付记录失败:', paymentError);
+    }
+
+  } catch (error) {
+    console.error('处理支付失败事件失败:', error);
+  }
 }
 
 /**
  * 处理订阅取消事件
  */
 async function handleSubscriptionCanceled(data: any) {
-  const supabase = await createClient();
+  try {
+    console.log("处理订阅取消事件:", data.id);
 
-  const { metadata } = data;
-  const userId = metadata?.user_id;
+    const supabase = await createClient();
 
-  if (!userId) {
-    return;
+    const { error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .update({
+        status: 'canceled',
+        canceled_at: new Date().toISOString(),
+        cancel_at_period_end: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('creem_subscription_id', data.id);
+
+    if (subscriptionError) {
+      console.error('更新订阅状态失败:', subscriptionError);
+    }
+
+  } catch (error) {
+    console.error('处理订阅取消事件失败:', error);
   }
-
-  // 更新订阅状态为已取消
-  await supabase
-    .from("subscriptions")
-    .update({
-      status: "canceled",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId)
-    .eq("status", "active");
-
-  console.log("订阅已取消:", { userId });
 }
 
