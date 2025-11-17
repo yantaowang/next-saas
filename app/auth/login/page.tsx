@@ -147,8 +147,8 @@ export default async function LoginPage({
             返回首页
           </Link>
         </div>
-      </div>
     </div>
+      </div>
   );
 }
 
